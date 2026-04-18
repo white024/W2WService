@@ -1,0 +1,6 @@
+@W2WService_HostAddress = http://localhost:5212
+
+GET {{W2WService_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
