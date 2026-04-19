@@ -1,17 +1,22 @@
 ﻿// AuthService/Models/RefreshToken.cs
+using MongoDB.Bson;
+using MongoDB.Bson.Serialization.Attributes;
 using Shared.Models;
 
 namespace AuthService.Models;
 
+[BsonIgnoreExtraElements]
 public class RefreshToken : BaseEntityModel
 {
-    public string Id { get; set; } = Guid.NewGuid().ToString();
+    [BsonId]
+    [BsonRepresentation(BsonType.ObjectId)]
+    public string Id { get; set; } = null!;
     public string UserId { get; set; } = null!;
     public string CompanyId { get; set; } = null!;
     public string TokenHash { get; set; } = null!;
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public DateTime ExpiresAt { get; set; }
+    public DateTime ExpiresAt { get; set; } 
     public DateTime? RevokedAt { get; set; }
     public string? ReplacedByTokenId { get; set; }
     public string? DeviceId { get; set; }

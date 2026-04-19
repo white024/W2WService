@@ -1,41 +1,31 @@
 ﻿// AuthService/Repositories/MongoRefreshTokenRepository.cs
 using AuthService.Models;
 using MongoDB.Driver;
+using Shared.Repositories.Base;
+using System.Security.Cryptography;
 
 namespace AuthService.Repositories;
 
-public class RefreshTokenRepository : IRefreshTokenRepository
+public class RefreshTokenRepository : MongoRepositoryBase<RefreshToken>, IRefreshTokenRepository
 {
-    private readonly IMongoCollection<RefreshToken> _collection;
-
-    public RefreshTokenRepository(IConfiguration config)
+    protected override string GetId(RefreshToken e) => e.Id;
+    public RefreshTokenRepository(IMongoDatabase database, IConfiguration config) : base(database, "RefreshToken")
     {
-        string connectionString = config["MongoDB:ConnectionString"]!;
-        string databaseName = config["MongoDB:Database"]!;
-        string collectionName = config.GetValue<string>("MongoDB:RefreshTokenCollection", "refresh_tokens")!;
-
-        var client = new MongoClient(connectionString);
-        var database = client.GetDatabase(databaseName);
-        _collection  = database.GetCollection<RefreshToken>(collectionName);
-
         CreateIndexes();
     }
 
     private void CreateIndexes()
     {
-        // ✅ TokenHash ile hızlı arama
         var tokenHashIndex = Builders<RefreshToken>.IndexKeys
             .Ascending(x => x.TokenHash);
 
-        // ✅ Süresi dolmuş tokenları otomatik sil (TTL Index)
         var ttlIndex = Builders<RefreshToken>.IndexKeys
             .Ascending(x => x.ExpiresAt);
 
-        // ✅ UserId ile tüm tokenları bulma
         var userIdIndex = Builders<RefreshToken>.IndexKeys
             .Ascending(x => x.UserId);
 
-        _collection.Indexes.CreateMany(new[]
+        Collection.Indexes.CreateMany(new[]
         {
             new CreateIndexModel<RefreshToken>(
                 tokenHashIndex,
@@ -45,7 +35,7 @@ public class RefreshTokenRepository : IRefreshTokenRepository
                 ttlIndex,
                 new CreateIndexOptions
                 {
-                    ExpireAfter = TimeSpan.Zero,  // ExpiresAt gelince otomatik sil
+                    ExpireAfter = TimeSpan.Zero,
                     Name = "idx_ttl_expires"
                 }),
 
@@ -55,41 +45,61 @@ public class RefreshTokenRepository : IRefreshTokenRepository
         });
     }
 
-    public async Task SaveAsync(RefreshToken token)
-    {
-        await _collection.InsertOneAsync(token);
-    }
+
 
     public async Task<RefreshToken?> GetByHashAsync(string tokenHash)
     {
-        return await _collection
-            .Find(x => x.TokenHash == tokenHash)
-            .FirstOrDefaultAsync();
+        return await FindOneAsync
+            (x => x.TokenHash == tokenHash);
+    }
+    private static string HashToken(string token)
+    {
+        byte[] bytes = SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(token));
+        return Convert.ToBase64String(bytes);
+    }
+    public async Task<RefreshToken?> GetByRawTokenAsync(string rawToken)
+    {
+        var hash = HashToken(rawToken);
+        return await GetByHashAsync(hash);
     }
 
-    public async Task RevokeAsync(string tokenId, string? replacedById = null)
+    public async Task RevokeAsync(RefreshToken refreshToken, string? replacedById = null)
     {
-        var update = Builders<RefreshToken>.Update
-            .Set(x => x.RevokedAt, DateTime.UtcNow)
-            .Set(x => x.ReplacedByTokenId, replacedById);
-
-        await _collection.UpdateOneAsync(
-            x => x.Id == tokenId,
-            update);
+        refreshToken.RevokedAt = DateTime.UtcNow;
+        refreshToken.ReplacedByTokenId = replacedById;
+        refreshToken.RevokedAt = DateTime.UtcNow.AddDays(7);
+        await UpdateAsync(refreshToken);
     }
 
     public async Task RevokeAllForUserAsync(string userId)
     {
-        // ✅ Güvenlik ihlalinde tüm tokenları iptal et
         var update = Builders<RefreshToken>.Update
-            .Set(x => x.RevokedAt, DateTime.UtcNow);
+            .Set(x => x.RevokedAt, DateTime.UtcNow)
+            .Set(x => x.ExpiresAt, DateTime.UtcNow.AddDays(7));
 
-        await _collection.UpdateManyAsync(
+        await Collection.UpdateManyAsync(
             x => x.UserId == userId && x.RevokedAt == null,
             update);
     }
-    public async Task DeleteExpiredAsync()
+
+    public async Task<RefreshToken?> GetActiveTokenAsync(
+    string userId,
+    string companyId,
+    string? deviceId = null,
+    string? ipAddress = null,
+    string? userAgent = null)
     {
-       
+
+
+        return (await
+            FindOneAsync(x => x.UserId == userId &&
+            x.CompanyId == companyId &&
+            x.RevokedAt == null &&
+            x.ExpiresAt > DateTime.UtcNow &&
+            x.DeviceId == deviceId &&
+            x.IpAddress == ipAddress &&
+            x.UserAgent == userAgent, q => q.SortByDescending(x => x.CreatedAt)));
+
     }
+
 }

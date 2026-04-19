@@ -19,7 +19,7 @@ public class LogEntryConsumer : KafkaConsumerBase<LogEntryEvent>
         KafkaSettings settings,
         IMongoDatabase db,
         ILogger<LogEntryConsumer> logger)
-        : base(settings, KafkaTopics.Log.Entry, logger)
+        : base(settings, KafkaTopics.LogTopics.Entry, logger)
     {
         _collection = db.GetCollection<LogEvent>("logs");
     }

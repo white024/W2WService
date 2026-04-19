@@ -18,17 +18,14 @@ public class TokenService
 
     public string CreateAccessToken(string userId, string companyId)
     {
-        using var rsa = RSA.Create();
-        rsa.ImportRSAPrivateKey(
-            Convert.FromBase64String(_config["Jwt:Key"]),
-            out _
-        );
+        var key = new SymmetricSecurityKey(
+         System.Text.Encoding.UTF8.GetBytes(_config?["Jwt:Key"]!)
+         );
 
         var creds = new SigningCredentials(
-            new RsaSecurityKey(rsa),
-            SecurityAlgorithms.RsaSha256
+            key,
+            SecurityAlgorithms.HmacSha256
         );
-
         var claims = new[]
         {
             new Claim("sub", userId),
@@ -36,11 +33,11 @@ public class TokenService
         };
 
         var token = new JwtSecurityToken(
-            issuer: _config["Jwt:Issuer"],
-            audience: _config["Jwt:Audience"],
+            issuer: _config?["Jwt:Issuer"],
+            audience: _config?["Jwt:Audience"],
             claims: claims,
             expires: DateTime.UtcNow.AddMinutes(
-                _config.GetValue<int>("Jwt:AccessTokenMinutes", 15)
+                _config!.GetValue<int>("Jwt:AccessTokenMinutes", 15)
             ),
             signingCredentials: creds
         );
@@ -59,7 +56,6 @@ public class TokenService
 
         var entity = new RefreshToken
         {
-            Id = Guid.NewGuid().ToString(),
             UserId = userId,
             CompanyId = companyId,
             TokenHash = HashToken(rawToken),
@@ -78,6 +74,7 @@ public class TokenService
     {
         return HashToken(rawToken) == storedHash;
     }
+
     private static string HashToken(string token)
     {
         byte[] bytes = SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(token));

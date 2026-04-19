@@ -16,7 +16,7 @@ public static class KafkaSinkExtensions
         this LoggerSinkConfiguration loggerSinkConfiguration,
         KafkaSettings settings,
         string serviceName,
-        string topic = KafkaTopics.Log.Entry)
+        string topic = KafkaTopics.LogTopics.Entry)
     {
         return loggerSinkConfiguration.Sink(new KafkaSink(settings, serviceName, topic));
     }

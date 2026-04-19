@@ -1,4 +1,7 @@
-﻿namespace Shared.Repositories.Interfaces;
+﻿using MongoDB.Driver;
+using System.Linq.Expressions;
+
+namespace Shared.Repositories.Interfaces;
 
 public interface IMongoRepositoryBase<T, TKey>
 {
@@ -11,7 +14,8 @@ public interface IMongoRepositoryBase<T, TKey>
         CancellationToken ct = default);
 
     Task<T?> FindOneAsync(
-        System.Linq.Expressions.Expression<Func<T, bool>> filter,
+        Expression<Func<T, bool>> filter,
+        Func<IFindFluent<T, T>, IFindFluent<T, T>>? orderBy = null,
         CancellationToken ct = default);
 
     Task<long> CountAsync(
@@ -22,7 +26,7 @@ public interface IMongoRepositoryBase<T, TKey>
 
     Task AddManyAsync(IEnumerable<T> entities, CancellationToken ct = default);
 
-    Task UpdateAsync(T entity, CancellationToken ct = default);
+    Task<T> UpdateAsync(T entity, CancellationToken ct = default);
 
     Task DeleteAsync(TKey id, CancellationToken ct = default);
 

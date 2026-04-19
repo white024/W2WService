@@ -12,6 +12,7 @@ public static class ApplicationBuilderExtensions
     public static IApplicationBuilder UseSharedMiddleware(this IApplicationBuilder app)
     {
         app.UseMiddleware<CorrelationIdMiddleware>();
+        app.UseMiddleware<RequestLoggingMiddleware>();
         app.UseMiddleware<ExceptionHandlingMiddleware>();
         return app;
     }

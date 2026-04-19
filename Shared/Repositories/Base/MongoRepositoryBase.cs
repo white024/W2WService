@@ -1,3 +1,4 @@
+using MongoDB.Bson;
 using MongoDB.Driver;
 using Shared.Repositories.Interfaces;
 using System.Linq.Expressions;
@@ -23,7 +24,7 @@ public abstract class MongoRepositoryBase<T> : IMongoRepositoryBase<T, string> w
 
     public async Task<T?> GetByIdAsync(string id, CancellationToken ct = default)
     {
-        var filter = Builders<T>.Filter.Eq("_id", id);
+        var filter = Builders<T>.Filter.Eq("_id", ObjectId.Parse(id));
         return await Collection.Find(filter).FirstOrDefaultAsync(ct);
     }
 
@@ -33,8 +34,18 @@ public abstract class MongoRepositoryBase<T> : IMongoRepositoryBase<T, string> w
     public async Task<IEnumerable<T>> FindAsync(Expression<Func<T, bool>> filter, CancellationToken ct = default)
         => await Collection.Find(filter).ToListAsync(ct);
 
-    public async Task<T?> FindOneAsync(Expression<Func<T, bool>> filter, CancellationToken ct = default)
-        => await Collection.Find(filter).FirstOrDefaultAsync(ct);
+    public async Task<T?> FindOneAsync(
+       Expression<Func<T, bool>> filter,
+       Func<IFindFluent<T, T>, IFindFluent<T, T>>? orderBy = null,
+       CancellationToken ct = default)
+    {
+        var query = Collection.Find(filter);
+
+        if (orderBy != null)
+            query = orderBy(query);
+
+        return await query.FirstOrDefaultAsync(ct);
+    }
 
     public async Task<long> CountAsync(Expression<Func<T, bool>>? filter = null, CancellationToken ct = default)
     {
@@ -51,21 +62,30 @@ public abstract class MongoRepositoryBase<T> : IMongoRepositoryBase<T, string> w
     public async Task AddManyAsync(IEnumerable<T> entities, CancellationToken ct = default)
         => await Collection.InsertManyAsync(entities, cancellationToken: ct);
 
-    public async Task UpdateAsync(T entity, CancellationToken ct = default)
+    public async Task<T> UpdateAsync(T entity, CancellationToken ct = default)
     {
-        var filter = Builders<T>.Filter.Eq("_id", GetId(entity));
+        var id = GetId(entity);
+        FilterDefinition<T> filter;
+
+        if (ObjectId.TryParse(id, out var objectId))
+            filter = Builders<T>.Filter.Eq("_id", objectId);
+        else
+            filter = Builders<T>.Filter.Eq("_id", id);
+
         await Collection.ReplaceOneAsync(filter, entity, cancellationToken: ct);
+
+        return entity;
     }
 
     public async Task DeleteAsync(string id, CancellationToken ct = default)
     {
-        var filter = Builders<T>.Filter.Eq("_id", id);
+        var filter = Builders<T>.Filter.Eq("_id", ObjectId.Parse(id));
         await Collection.DeleteOneAsync(filter, ct);
     }
 
     public async Task<bool> ExistsAsync(string id, CancellationToken ct = default)
     {
-        var filter = Builders<T>.Filter.Eq("_id", id);
+        var filter = Builders<T>.Filter.Eq("_id", ObjectId.Parse(id));
         return await Collection.Find(filter).AnyAsync(ct);
     }
 

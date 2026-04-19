@@ -1,9 +1,14 @@
 <Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="docker-compose.yml" />
+  </Folder>
+  <Project Path="AppHost/AppHost.csproj" />
   <Project Path="AuthService/AuthService.csproj" />
   <Project Path="CartService/CartService.csproj" />
   <Project Path="CatalogService/CatalogService.csproj" />
   <Project Path="CompanyService/CompanyService.csproj" />
   <Project Path="CustomerService/CustomerService.csproj" Id="14035ffb-01fa-4214-8156-c9ef43657e76" />
+  <Project Path="GatewayService/GatewayService.csproj" />
   <Project Path="HistoryService/HistoryService.csproj" />
   <Project Path="LogService/LogService.csproj" />
   <Project Path="NotificationService/NotificationService.csproj" />
