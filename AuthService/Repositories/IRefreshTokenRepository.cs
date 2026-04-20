@@ -17,6 +17,7 @@ public interface IRefreshTokenRepository : IMongoRepositoryBase<RefreshToken, st
 
     /// <summary>Güvenlik ihlalinde kullanıcının tüm tokenlarını iptal eder.</summary>
     Task RevokeAllForUserAsync(string userId);
+    Task RevokeAllForUserAsync(string userId, string? deviceId, string? ipAdress, string? userAgent);
 
     /// <summary>Süresi dolmuş ve iptal edilmiş tokenları temizler. (Manuel TTL)</summary>
 

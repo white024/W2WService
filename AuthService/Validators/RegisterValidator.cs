@@ -1,7 +1,7 @@
 ﻿using AuthService.DTOs;
 using FluentValidation;
 
-public class RegisterValidator : AbstractValidator<RegisterDto>
+public class RegisterValidator : AbstractValidator<UserInsertDto>
 {
     public RegisterValidator()
     {

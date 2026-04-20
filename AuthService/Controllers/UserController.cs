@@ -1,37 +1,38 @@
-﻿using AuthService.DTOs;
-//using AuthService.Filters;
-using AuthService.Models;
-using AuthService.Repositories;
+﻿using AuthService.Models;
 using AuthService.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Shared.Attributes;
+using Shared.Controllers;
 using Shared.Extensions;
 using Shared.Models;
-using System.Security.Claims;
-using static Shared.Kafka.Topics.KafkaTopics;
+using Shared.Services;
 
 namespace AuthService.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
 [ApiKeyAuth]
-public class UserController : ControllerBase
+public class UserController : AuthControllerBase
 {
     private readonly IUserService _userService;
-    public UserController(IUserService userService)
+    private readonly TokenService _tokenService;
+    public UserController(IUserService userService, TokenService tokenService)
     {
         _userService = userService;
+        _tokenService = tokenService;
     }
 
     [HttpPost("login")]
     public async Task<IActionResult> Login(LoginDto dto)
     {
+        var requesterId = GetRequesterId(_tokenService);
+
         try
         {
-            dto.IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
-            dto.UserAgent = Request.Headers["User-Agent"].ToString();
-            dto.DeviceId  = Request.Headers["X-Device-Id"].ToString();
+            dto.IpAddress = IpAddress;
+            dto.UserAgent = UserAgent;
+            dto.DeviceId  = DeviceId;
             ReturnObject<UserDto>? result = (await _userService.LoginAsync(dto));
 
             if (result?.Result <= 0)
@@ -39,116 +40,216 @@ public class UserController : ControllerBase
             if (result?.Result == 2) return Ok(result);
             if (result?.ResultObject?.RefreshToken == null) return BadRequest("Token Bilgisi Alınamadı");
             result?.ResultObject?.RefreshToken =  Response.AppendRefreshToken(result.ResultObject.RefreshToken);
+            if (result?.ResultObject?.Token == null) return BadRequest("Token Bilgisi Alınamadı");
+            result?.ResultObject?.Token =  Response.AppendAccessToken(result.ResultObject.Token);
             return Ok(result);
 
         }
         catch (Exception e)
         {
+            await _userService.RevokeAllForUserAsync(requesterId, dto.DeviceId, dto.IpAddress, dto.UserAgent);
+            Response.ClearAuthCookies();
             return BadRequest(ReturnObject<UserDto>.Error("Bir Hata Oluştu", e));
         }
     }
 
     [HttpPost("register")]
-    public async Task<IActionResult> Register(RegisterDto dto)
+    public async Task<IActionResult> Register(UserInsertDto dto)
     {
+        var requesterId = GetRequesterId(_tokenService);
+
         try
         {
-            dto.IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
-            dto.UserAgent = Request.Headers["User-Agent"].ToString();
-            dto.DeviceId  = Request.Headers["X-Device-Id"].ToString();
+            dto.IpAddress = IpAddress;
+            dto.UserAgent = UserAgent;
+            dto.DeviceId  = DeviceId;
             ReturnObject<UserDto>? result = await _userService.RegisterAsync(dto);
             if (result?.Result == 0)
                 return BadRequest("Bu email zaten kayıtlı.");
             if (result?.ResultObject?.RefreshToken == null) return BadRequest("Token Bilgisi Alınamadı");
-
             result?.ResultObject?.RefreshToken =  Response.AppendRefreshToken(result.ResultObject.RefreshToken);
+            if (result?.ResultObject?.Token == null) return BadRequest("Token Bilgisi Alınamadı");
+            result?.ResultObject?.Token =  Response.AppendAccessToken(result.ResultObject.Token);
             return Ok(result);
 
         }
         catch (Exception e)
         {
+            await _userService.RevokeAllForUserAsync(requesterId, dto.DeviceId, dto.IpAddress, dto.UserAgent);
+            Response.ClearAuthCookies();
             return BadRequest(ReturnObject<UserDto>.Error("Bir Hata Oluştu", e));
         }
     }
 
-    [HttpGet("me")]
-    public async Task<IActionResult> Me()
-    {
-        try
-        {
-            var rawToken = Request.Cookies["refreshToken"];
-            ReturnObject<UserDto>? result = null!;
-            if (string.IsNullOrEmpty(rawToken))
-                return Ok(ReturnObject<UserDto>.Fail("Taken Bilgisi Alınamadı Tekrar Giriş Yapınız"));
-
-            result =  await _userService.ValidateRefreshTokenAsync(rawToken);
-
-            if (result == null)
-            {
-                result = await _userService.RefreshAsync(rawToken);
-                if (result == null)
-                    return Ok(ReturnObject<UserDto>.Fail("Token geçersiz"));
-
-                if (result?.ResultObject?.RefreshToken == null) return BadRequest("Token Bilgisi Alınamadı");
-
-                result?.ResultObject?.RefreshToken =  Response.AppendRefreshToken(result.ResultObject.RefreshToken);
-            }
-
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(ReturnObject<UserDto>.Error("Bir Hata Oluştu Lütfen Tekrar Giriş Yapınız", ex));
-        }
-
-
-    }
     [HttpPost("refresh")]
     public async Task<IActionResult> Refresh()
     {
-        var rawToken = Request.Cookies["refreshToken"];
+        var requesterId = GetRequesterId(_tokenService);
 
-        if (string.IsNullOrEmpty(rawToken))
-            return Unauthorized();
+        try
+        {
+        
+            if (string.IsNullOrEmpty(RawRefreshToken))
+                return Ok(ReturnObject<UserDto>.Fail("Token Bilgisi Alınamadı, Tekrar Giriş Yapınız"));
 
-        var result = await _userService.RefreshAsync(rawToken);
+            var result = await _userService.RefreshAsync(
+                RawRefreshToken,
+                DeviceId, IpAddress, UserAgent
+                );
 
-        if (result == null)
-            return Unauthorized();
-        if (result?.ResultObject?.RefreshToken == null) return BadRequest("Token Bilgisi Alınamadı");
+            if (result == null)
+                return Unauthorized();
 
-        result.ResultObject.RefreshToken = Response.AppendRefreshToken(result.ResultObject.RefreshToken);
+            if (result.ResultObject?.RefreshToken == null) return BadRequest("Token Bilgisi Alınamadı");
+            result.ResultObject.RefreshToken = Response.AppendRefreshToken(result.ResultObject.RefreshToken);
+            if (result?.ResultObject?.Token == null) return BadRequest("Token Bilgisi Alınamadı");
+            result.ResultObject.Token =  Response.AppendAccessToken(result.ResultObject.Token);
 
-        return Ok(result);
+            return Ok(result);
+        }
+        catch (Exception e)
+        {
+            await _userService.RevokeAllForUserAsync(requesterId, DeviceId, IpAddress, UserAgent);
+            Response.ClearAuthCookies();
+            return BadRequest(ReturnObject<UserDto>.Error("Bir Hata Oluştu, Lütfen Tekrar Giriş Yapınız", e));
+        }
     }
 
     [HttpPost("logout")]
     [Authorize]
     public async Task<IActionResult> Logout(LogoutDto? dto)
     {
-        var rawToken = Request.Cookies["refreshToken"];
-        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if(rawToken == null) return Unauthorized();
-        ReturnObject<bool> result = await _userService.LogoutAsync(rawToken!, userId!, dto);
+        var requesterId = GetRequesterId(_tokenService);
 
-        Response.Cookies.Delete("refreshToken");
-        return Ok(result);
+        try
+        {
+            if (RawRefreshToken == null) return Unauthorized();
+            ReturnObject<bool> result = await _userService.LogoutAsync(RawRefreshToken!, requesterId!, dto);
+            Response.ClearAuthCookies();
+            return Ok(result);
+        }
+        catch (Exception e)
+        {
+
+            await _userService.RevokeAllForUserAsync(requesterId, DeviceId, IpAddress, UserAgent);
+            Response.ClearAuthCookies();
+            return BadRequest(ReturnObject<UserDto>.Error("Bir Hata Oluştu", e));
+        }
+
     }
 
-    //[HttpGet("{id}")]
-    //public async Task<IActionResult> GetById(string id)
-    //{
-    //    try
-    //    {
-    //        ReturnObject<UserDto>? result = await _userService.GetByIdAsync(id);
-    //        if (result?.Result == 0)
-    //            return BadRequest("Bu email zaten kayıtlı.");
-    //        return Ok(result);
+    [HttpGet("profile/{id}")]
+    [Authorize]
+    public async Task<IActionResult> GetProfile(string id)
+    {
+        var requesterId = GetRequesterId(_tokenService);
+        try
+        {
 
-    //    }
-    //    catch (Exception e)
-    //    {
-    //        return BadRequest(ReturnObject<UserDto>.Error("Bir Hata Oluştu", e));
-    //    }
-    //}
+            if (requesterId == id)
+            {
+                var result = await _userService.GetProfileAsync(id);
+                return Ok(result);
+            }
+
+            var summary = await _userService.GetUserSummaryAsync(id);
+            return Ok(summary);
+        }
+        catch (Exception e)
+        {
+            await _userService.RevokeAllForUserAsync(requesterId, DeviceId, IpAddress, UserAgent);
+            Response.ClearAuthCookies();
+            return BadRequest(ReturnObject<UserDto>.Error("Bir Hata Oluştu", e));
+
+        }
+
+    }
+
+    [HttpPut("profile")]
+    [Authorize]
+    public async Task<IActionResult> UpdateProfile([FromBody] UserUpdateDto dto)
+    {
+        var requesterId = GetRequesterId(_tokenService);
+
+        try
+        {
+            if (requesterId == null) return Unauthorized();
+
+            var result = await _userService.UpdateProfileAsync(requesterId, dto);
+            return Ok(result);
+        }
+        catch (Exception e)
+        {
+            await _userService.RevokeAllForUserAsync(requesterId, DeviceId, IpAddress, UserAgent);
+            Response.ClearAuthCookies();
+            return BadRequest(ReturnObject<UserDto>.Error("Bir Hata Oluştu", e));
+        }
+
+    }
+
+    [HttpPut("profile/{id}")]
+    [Authorize]
+    public async Task<IActionResult> UpdateProfile(string id, [FromBody] UserUpdateDto dto)
+    {
+        var requesterId =  GetRequesterId(_tokenService);
+        try
+        {
+            if (requesterId == null) return Unauthorized();
+            User? checkUser = await _userService.GetUserEntityAsync(requesterId);
+            if (checkUser == null) return BadRequest("Kullanıcı Bilgisi Alınamadı");
+            if (checkUser.Role != Shared.Enums.UserRole.Admin && checkUser.Role != Shared.Enums.UserRole.Platform) return BadRequest("Yetkisiz işlem");
+            var result = await _userService.UpdateProfileAsync(id, dto);
+            return Ok(result);
+        }
+        catch (Exception e)
+        {
+            await _userService.RevokeAllForUserAsync(requesterId, DeviceId, IpAddress, UserAgent);
+            Response.ClearAuthCookies();
+            return BadRequest(ReturnObject<UserDto>.Error("Bir Hata Oluştu", e));
+        }
+
+    }
+
+    [HttpPut("change-password")]
+    [Authorize]
+    public async Task<IActionResult> ChangePassword([FromBody] UserChangePasswordDto dto) //TODO: yanlış şifre ile şifre değiştirme işleminde tokeni siliyorum ama sonrasında doğru şifre girerse token almak için ekleme yapılacak
+    {
+        var requesterId = GetRequesterId(_tokenService);
+        try
+        {
+            if (requesterId == null) return Unauthorized();
+
+            var result = await _userService.ChangePasswordAsync(requesterId, dto);
+            await _userService.RevokeAllForUserAsync(requesterId, DeviceId, IpAddress, UserAgent);
+            Response.ClearAuthCookies();
+            return Ok(result);
+
+        }
+        catch (Exception e)
+        {
+            await _userService.RevokeAllForUserAsync(requesterId, DeviceId, IpAddress, UserAgent);
+            Response.ClearAuthCookies();
+            return BadRequest(ReturnObject<UserDto>.Error("Bir Hata Oluştu", e));
+        }
+
+    }
+
+
+    [HttpGet("{id}")]
+    [Authorize]
+    public async Task<IActionResult> GetById(string id)
+    {
+        try
+        {
+            ReturnObject<UserDto>? result = await _userService.GetByIdAsync(id);
+            if (result?.Result == 0)
+                return BadRequest("Kullanıcı bulunamadı.");
+            return Ok(result);
+
+        }
+        catch (Exception e)
+        {
+            return BadRequest(ReturnObject<UserDto>.Error("Bir Hata Oluştu", e));
+        }
+    }
 }

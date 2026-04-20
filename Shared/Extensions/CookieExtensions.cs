@@ -15,4 +15,21 @@ public static class CookieExtensions
         });
         return null!;
     }
+    public static string? AppendAccessToken(this HttpResponse response, string token)
+    {
+        response.Cookies.Append("accessToken", token, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure   = true,
+            SameSite = SameSiteMode.Strict,
+            Expires  = DateTimeOffset.UtcNow.AddMinutes(15)
+        });
+        return null!;
+    }
+
+    public static void ClearAuthCookies(this HttpResponse response)
+    {
+        response.Cookies.Delete("accessToken");
+        response.Cookies.Delete("refreshToken");
+    }
 }

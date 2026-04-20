@@ -13,7 +13,7 @@ public static class ApplicationBuilderExtensions
     {
         app.UseMiddleware<CorrelationIdMiddleware>();
         app.UseMiddleware<RequestLoggingMiddleware>();
-        app.UseMiddleware<ExceptionHandlingMiddleware>();
+        app.UseMiddleware<ExceptionHandlingMiddleware>();   
         return app;
     }
 }

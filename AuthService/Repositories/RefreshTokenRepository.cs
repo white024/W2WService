@@ -82,6 +82,17 @@ public class RefreshTokenRepository : MongoRepositoryBase<RefreshToken>, IRefres
             update);
     }
 
+    public async Task RevokeAllForUserAsync(string userId, string? deviceId, string? ipAdress, string? userAgent)
+    {
+        var update = Builders<RefreshToken>.Update
+            .Set(x => x.RevokedAt, DateTime.UtcNow)
+            .Set(x => x.ExpiresAt, DateTime.UtcNow.AddDays(7));
+
+        await Collection.UpdateManyAsync(
+            x => x.UserId == userId && x.RevokedAt == null && x.DeviceId == (deviceId ?? "") && x.IpAddress == (ipAdress ?? "") && x.UserAgent == (userAgent ?? ""),
+            update);
+    }
+
     public async Task<RefreshToken?> GetActiveTokenAsync(
     string userId,
     string companyId,
