@@ -18,7 +18,7 @@ public class TokenService
         _config = config;
     }
 
-    public string CreateAccessToken(string userId, string companyId)
+    public string CreateAccessToken(string userId, int? companyId, int? customerId = null)
     {
         var key = new SymmetricSecurityKey(
          System.Text.Encoding.UTF8.GetBytes(_config?["Jwt:Key"]!)
@@ -28,11 +28,17 @@ public class TokenService
             key,
             SecurityAlgorithms.HmacSha256
         );
-        var claims = new[]
+
+        var claims = new List<Claim>
         {
-            new Claim("sub", userId),
-            new Claim("cid", companyId),
+            new Claim("sub", userId)
         };
+
+        if (companyId.HasValue)
+            claims.Add(new Claim("cid", companyId.Value.ToString()));
+
+        if (customerId.HasValue)
+            claims.Add(new Claim("cusid", customerId.Value.ToString()));
 
         var token = new JwtSecurityToken(
             issuer: _config?["Jwt:Issuer"],

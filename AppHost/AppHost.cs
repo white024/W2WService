@@ -10,6 +10,12 @@ var authService = builder.AddProject<AuthService>("auth")
     .WithReference(kafka)
      .WithExternalHttpEndpoints();
 
+var customerService = builder.AddProject<CustomerService>("customer")
+  .WithReference(seq)
+    .WithReference(kafka)
+     .WithExternalHttpEndpoints();
+
+
 var catalogService = builder.AddProject<CatalogService>("catalog")
   .WithReference(seq)
     .WithReference(kafka)
@@ -53,6 +59,7 @@ var gateway = builder.AddProject<GatewayService>("gateway")
     .WithReference(orderService.GetEndpoint("http"))
     .WithReference(paymentService.GetEndpoint("http"))
     .WithReference(historyService.GetEndpoint("http"))
+    .WithReference(customerService.GetEndpoint("http"))
     .WithReference(seq.GetEndpoint("http"))
      .WithExternalHttpEndpoints();
 

@@ -1,3 +1,4 @@
+using GatewayService.Extensions;
 using GatewayService.Middleware;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
@@ -8,23 +9,30 @@ using Yarp.ReverseProxy.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddSharedConfiguration(builder.Configuration);
+
 JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
 
-
 builder.Services.AddSharedTokenService();
-builder.Services.AddSharedJwtAuthentication(builder.Configuration);
+
+builder.Services.AddSharedGatewayAuthentication(builder.Configuration);  
+
 builder.Services.AddAuthorization();
 builder.Services.AddHttpClient();
 builder.Services.AddServiceDiscovery();
+
 builder.Services.AddReverseProxy()
     .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"))
-    .AddServiceDiscoveryDestinationResolver();
+    .AddServiceDiscoveryDestinationResolver()
+    .AddSharedLoadBalancing();
 
 var app = builder.Build();
 
 app.UseMiddleware<RefreshTokenMiddleware>();
+
 app.UseAuthentication();
 app.UseAuthorization();
+
 app.MapReverseProxy();
 
 await app.RunAsync();

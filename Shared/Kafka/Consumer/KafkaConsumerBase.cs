@@ -37,7 +37,7 @@ public abstract class KafkaConsumerBase<TMessage> : BackgroundService where TMes
             BootstrapServers = settings.BootstrapServers,
             GroupId          = settings.GroupId,
             AutoOffsetReset  = AutoOffsetReset.Earliest,
-            EnableAutoCommit = false,          // Manuel commit yapıyoruz
+            EnableAutoCommit = false,
             SessionTimeoutMs = settings.SessionTimeoutMs
         };
 

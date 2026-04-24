@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+option csharp_namespace = "Shared.Grpc";
+
+package customer;
+
+service CustomerGrpc {
+  rpc GetUserCompanies (GetUserCompaniesRequest) returns (GetUserCompaniesResponse);
+  rpc GetCompanyCustomer (GetCompanyCustomerRequest) returns (GetCompanyCustomerResponse);
+}
+
+message GetUserCompaniesRequest {
+  string user_id = 1;
+}
+
+message CompanyItem {
+  int32 id          = 1;
+  string name       = 2;
+  string role       = 3;
+  int32 customer_id = 4;
+}
+
+message GetUserCompaniesResponse {
+  repeated CompanyItem companies = 1;
+}
+
+message GetCompanyCustomerRequest {
+  string user_id    = 1;
+  int32 company_id  = 2;
+}
+
+message GetCompanyCustomerResponse {
+  int32  customer_id  = 1;
+  string customer_name = 2;
+  bool   found        = 3;
+}

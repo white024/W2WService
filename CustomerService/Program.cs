@@ -1,36 +1,46 @@
-
+using CustomerService.Kafka.Consumers;
+using Serilog;
 using Shared.Extensions;
+using Shared.Kafka.Interfaces;
+using Shared.Kafka.Producer;
+using Shared.Kafka.Settings;
 
-namespace CustomerService
+var builder = WebApplication.CreateBuilder(args);
+
+
+builder.Services.AddControllers();
+builder.Services.AddOpenApi();
+builder.Host.AddSharedLogging("CustomerService");
+
+var kafkaSettings = builder.Configuration
+    .GetSection("Kafka").Get<KafkaSettings>()!;
+
+builder.Services.AddSingleton<IKafkaProducer>(sp =>
+    new KafkaProducer(
+        kafkaSettings,
+        sp.GetRequiredService<ILogger<KafkaProducer>>()));
+
+builder.Services.AddHostedService<UserRegisteredConsumer>();
+
+Log.Logger = new LoggerConfiguration()
+    .WriteTo.Console()
+    .WriteTo.Seq(builder.Configuration["Seq:Url"]!)
+    .WriteTo.KafkaSink(kafkaSettings, "CustomerService")
+    .CreateLogger();
+
+builder.Host.UseSerilog();
+builder.Services.AddSharedKafka(builder.Configuration);
+builder.Services.AddSingleton(kafkaSettings);
+builder.Services.AddHostedService<UserRegisteredConsumer>();
+var app = builder.Build();
+
+if (app.Environment.IsDevelopment())
 {
-    public class Program
-    {
-        public static async Task Main(string[] args)
-        {
-            var builder = WebApplication.CreateBuilder(args);
-
-            // Add services to the container.
-
-            builder.Services.AddControllers();
-            // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-            builder.Services.AddOpenApi();
-            builder.Host.AddSharedLogging("CustomerService");
-            builder.Services.AddSharedKafka(builder.Configuration);
-            var app = builder.Build();
-
-            // Configure the HTTP request pipeline.
-            if (app.Environment.IsDevelopment())
-            {
-                app.MapOpenApi();
-            }
-
-            app.UseAuthorization();
-
-            app.UseSharedMiddleware();
-
-            app.MapControllers();
-
-            await app.RunAsync();
-        }
-    }
+    app.MapOpenApi();
 }
+
+app.UseAuthorization();
+
+app.MapControllers();
+
+app.Run();

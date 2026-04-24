@@ -4,11 +4,10 @@
     <File Path="TODO.cs" />
   </Folder>
   <Project Path="AppHost/AppHost.csproj" />
-  <Project Path="AuthService/AuthService.csproj" />
+  <Project Path="AuthService/AuthService.csproj" Id="9410f544-189b-4c8f-a53b-3a94e03dbe70" />
   <Project Path="CartService/CartService.csproj" />
   <Project Path="CatalogService/CatalogService.csproj" />
-  <Project Path="CompanyService/CompanyService.csproj" />
-  <Project Path="CustomerService/CustomerService.csproj" Id="14035ffb-01fa-4214-8156-c9ef43657e76" />
+  <Project Path="CustomerService/CustomerService.csproj" Id="13cde3b2-59a0-4eac-bb41-48d909a66b6f" />
   <Project Path="GatewayService/GatewayService.csproj" />
   <Project Path="HistoryService/HistoryService.csproj" />
   <Project Path="LogService/LogService.csproj" />

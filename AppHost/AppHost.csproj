@@ -2,9 +2,11 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\AuthService\AuthService.csproj" />
+		<ProjectReference Include="..\CustomerService\CustomerService.csproj" />
 		<ProjectReference Include="..\GatewayService\GatewayService.csproj" />
 		<ProjectReference Include="..\CartService\CartService.csproj" />
 		<ProjectReference Include="..\CatalogService\CatalogService.csproj" />
+		<ProjectReference Include="..\NotificationService\NotificationService.csproj" />
 		<ProjectReference Include="..\OrderManagementService\OrderManagementService.csproj" />
 		<ProjectReference Include="..\PaymentService\PaymentService.csproj" />
 		<ProjectReference Include="..\HistoryService\HistoryService.csproj" />
